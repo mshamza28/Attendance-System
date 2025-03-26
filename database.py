@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import threading
+import gc
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -372,5 +373,22 @@ class AttendanceSystemDB:
     def close_connection(self):
         """Close the database connection for the current thread."""
         if hasattr(thread_local, 'conn'):
-            thread_local.conn.close()
-            del thread_local.conn
+            try:
+                # Commit any pending transactions
+                thread_local.conn.commit()
+                
+                # Close the connection
+                thread_local.conn.close()
+                
+                # Remove the connection from thread_local
+                delattr(thread_local, 'conn')
+                
+                # Force garbage collection to help release file handles
+                import gc
+                gc.collect()
+                
+                return True
+            except Exception as e:
+                # Log the error but don't raise it
+                print(f"Error closing connection: {e}")
+                return False

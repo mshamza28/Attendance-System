@@ -5,6 +5,7 @@ import os
 import tempfile
 import shutil
 import base64
+import time
 from datetime import datetime
 
 
@@ -15,6 +16,10 @@ def render_settings(db):
         db: Database connection
     """
     st.header("System Settings")
+    
+    # Initialize session state variables if they don't exist
+    if 'reset_stage' not in st.session_state:
+        st.session_state.reset_stage = 0
     
     # Database settings
     st.subheader("Database Settings")
@@ -39,7 +44,7 @@ def render_settings(db):
                     # Create a new database instance with the new path
                     # The get_database function will be called on rerun
                     st.success(f"Database path updated to: {new_db_path}")
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error updating database path: {e}")
             else:
@@ -92,25 +97,49 @@ def render_settings(db):
                 st.error(f"Error creating backup: {e}")
     
     with col2:
-        reset_db = st.button("Reset Database", type="primary")
+        # First stage: Show the initial reset button
+        if st.session_state.reset_stage == 0:
+            if st.button("Reset Database", type="primary"):
+                st.session_state.reset_stage = 1
+                st.rerun()
         
-        if reset_db:
+        # Second stage: Show confirmation
+        elif st.session_state.reset_stage == 1:
+            st.warning("⚠️ WARNING: This will delete ALL data and cannot be undone!")
             confirm = st.checkbox("I understand this will delete ALL data and cannot be undone.")
             
-            if confirm:
-                try:
-                    # Close the current connection
-                    db.close_connection()
-                    
-                    # Delete the database file
-                    if os.path.exists(st.session_state.db_path):
-                        os.remove(st.session_state.db_path)
-                    
-                    # Force recreation of the database on next rerun
-                    st.experimental_rerun()
-                    
-                    st.success("Database reset successfully!")
-                except Exception as e:
-                    st.error(f"Error resetting database: {e}")
-            else:
-                st.warning("Please confirm the reset operation.")
+            col_cancel, col_confirm = st.columns(2)
+            with col_cancel:
+                if st.button("Cancel"):
+                    st.session_state.reset_stage = 0
+                    st.rerun()
+            
+            with col_confirm:
+                if st.button("Confirm Reset", type="primary", disabled=not confirm):
+                    try:
+                        # Close the current connection
+                        db.close_connection()
+                        
+                        # Add debug info about the database path
+                        st.info(f"Attempting to reset database at: {st.session_state.db_path}")
+                        
+                        # Create a flag file to trigger reset on next startup
+                        flag_path = f"{st.session_state.db_path}.reset"
+                        with open(flag_path, 'w') as f:
+                            f.write('reset')
+                        
+                        # Set a session flag to indicate reset is needed
+                        st.session_state.db_reset_needed = True
+                        
+                        # Reset the stage
+                        st.session_state.reset_stage = 0
+                        
+                        # Show success message
+                        st.success("Database marked for reset. Application will restart...")
+                        
+                        # Add a short delay to show the success message
+                        time.sleep(2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error resetting database: {e}")
+                        st.code(str(e))  # Show the full error details

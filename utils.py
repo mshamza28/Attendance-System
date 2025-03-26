@@ -60,18 +60,18 @@ def format_dataframe_for_display(df):
             lambda x: f"{x:.2f}" if pd.notnull(x) else "-"
         )
     
-    # Apply status-based color formatting
+    # Apply status-based color formatting with darker, more vibrant colors
+    # that will be visible against a dark background
     def highlight_status(row):
         if 'status' in row and row.status == 'present':
-            return ['background-color: #d4edda'] * len(row)
+            return ['background-color: #4CAF50; color: white'] * len(row)  # Stronger green
         elif 'status' in row and row.status == 'absent':
-            return ['background-color: #f8d7da'] * len(row)
+            return ['background-color: #F44336; color: white'] * len(row)  # Stronger red
         elif 'status' in row and row.status == 'late':
-            return ['background-color: #fff3cd'] * len(row)
+            return ['background-color: #FFC107; color: black'] * len(row)  # Stronger yellow
         return [''] * len(row)
     
     return display_df.style.apply(highlight_status, axis=1)
-
 
 def get_date_defaults():
     """Get default dates for UI elements.
